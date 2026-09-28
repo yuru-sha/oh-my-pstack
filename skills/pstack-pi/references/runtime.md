@@ -6,11 +6,21 @@ skill path, or long-running loop.
 
 ## Host selection
 
-Use the capabilities exposed by the current agent host. Do not assume Cursor,
-Claude Code, Codex, OMP, a particular CLI, or a particular model vendor. When a
-capability is unavailable, preserve the workflow gate and use the nearest truthful
-local equivalent. Do not claim a child, review, transcript, or live check happened
-unless the host reported it.
+Use an explicit host identity supplied by the active runtime, when available. Never
+identify the current host from `command -v` or the presence of a CLI executable:
+those only show installation, not which agent owns the current session. Do not
+infer host identity from undocumented environment variables. If the active runtime
+does not identify itself, report the host as unknown and use only capabilities
+verified from the live tool inventory.
+
+For OMP, the task tool's live agent inventory is authoritative. The bundled OMP
+task agents are `scout`, `reviewer`, `security-reviewer`, `task`, and `sonic`;
+project, user, and extension agents can add names. Never treat a canonical pstack
+role as a host agent name without applying the OMP mapping.
+
+When a capability is unavailable, preserve the workflow gate and use the nearest
+truthful local equivalent. Do not claim a child, review, transcript, or live check
+happened unless the host reported it.
 
 ## Canonical roles
 
@@ -27,9 +37,15 @@ unless the host reported it.
 | `owner` | One coupled implementation session retained through its lifecycle. |
 | `mechanical` | Fully specified low-judgment edits. |
 
-Map these roles to the live host's agent or task names. OMP's recommended mapping is
-`scout`, `designer`, `reviewer`, `security-reviewer`, `librarian`, `task`, and
-`sonic`. Claude Code and Codex may expose different names. The live inventory wins.
+Map these roles using the live host's agent or task names. OMP's bundled task
+agents are `scout`, `reviewer`, `security-reviewer`, `task`, and `sonic`.
+Project, user, and extension agents may add names. The live inventory wins.
+The OMP adapter maps `explorer` and `watcher` to `scout`, `reviewer` and
+`synthesizer` to `reviewer`, implementation and general roles to `task`, and
+low-judgment mechanical work to `sonic`. `planner`, `designer`, and `researcher`
+map to `task` with their canonical role preserved in the brief. Do not pass
+canonical role labels directly as agent names. Stop if a canonical role has no
+adapter mapping. Claude Code and Codex may expose different names.
 
 Every child brief must stand alone. It must name its goal, role, writable scope,
 acceptance criteria, verification command, forbidden scope, and report format. A
@@ -85,17 +101,14 @@ An observable fact belongs to a probe or verification run, not a user question.
 ## Skills and paths
 
 Invoke skills by their host-supported skill name, normally `/skill:<name>` or `$name`.
+Use `skill://<skill-name>` to load a skill. For a file under that skill, use
+`skill://<skill-name>/<relative-path>`. The first path segment is always the
+actual skill name, not the name of the currently active skill. Resolve relative
+Markdown links against the file that contains them; do not turn a relative path
+into a URI prefixed with the active skill name.
+
 Within this package, sibling files are under `skills/<name>/`. Do not use a
 vendor-specific plugin path or assume a global installation path.
-
-OpenCode's native Agent Skills loader looks in `.opencode/skills/` for a project or
-`~/.config/opencode/skills/` globally. When installing this repository for
-OpenCode, copy the contents of this package's `skills/` directory into one of
-those locations. OpenCode loads a skill on demand through its native `skill`
-tool; it does not automatically scan an arbitrary cloned repository directory.
-OpenCode's built-in primary and subagents are the delegation surface. Use the
-host's `opencode.json` or `opencode.jsonc` model configuration and live agent
-inventory rather than assuming Pi's `pi-subagents` settings apply.
 
 OpenCode's native Agent Skills loader looks in `.opencode/skills/` for a project or
 `~/.config/opencode/skills/` globally. When installing this repository for

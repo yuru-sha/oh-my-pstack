@@ -15,42 +15,39 @@ Use the live host's configured names. This reference mapping targets OMP, a
 Pi-based runtime; other hosts must substitute their own names through the runtime
 contract.
 
-| Canonical role | Pi/OMP agent | Contract |
+| Canonical role | OMP agent | Contract |
 |---|---|---|
 | `explorer` | `scout` | Read-only repository reconnaissance, trace reduction, narrow audits. |
 | `watcher` | `scout` | Observe one exact generation or external-state transition, then terminate. |
-| `planner` | `designer` | Technical planning, architecture, decomposition, sequencing, and non-visual design candidates. |
-| `designer` | `designer` | Visual, interaction, and product-design candidates. |
+| `planner` | `task` | Technical planning, architecture, decomposition, sequencing, and non-visual design candidates. |
+| `designer` | `task` | Visual, interaction, and product-design candidates. |
 | `reviewer` | `reviewer` | Independent code, protocol, behavioral, or security review. |
-| `researcher` | `librarian` | Source-verified external library, framework, API, protocol, or version research. |
+| `researcher` | `task` | Source-verified external library, framework, API, protocol, or version research. |
 | `synthesizer` | `reviewer` | Cross-report synthesis, adjudication, and advisory judgment over frozen evidence. |
 | `implementer` | `task` | Bounded implementation or test changes with explicit write ownership. |
 | `owner` | `task` | One coupled multi-step implementation session retained through IRC follow-ups. |
 | `mechanical` | `sonic` | Fully specified low-judgment edits. Ambiguity returns to the root. |
 
-The reference OMP roster is closed:
+The OMP bundled task agents are `scout`, `reviewer`, `security-reviewer`,
+`task`, and `sonic`. Project, user, and extension agents may add names to the
+live inventory. Treat the live task schema and its agent inventory as authoritative.
+Never assume `designer` or `librarian` exists just because a canonical role has
+that name.
 
-```text
-scout
-designer
-reviewer
-security-reviewer
-librarian
-task
-sonic
-```
-
-A canonically routed task item's `agent` value must be one of those bundled names. Canonical role labels and model aliases are not agent names.
+Every canonical role above maps to an agent name available in the bundled OMP
+roster. Preserve the canonical role in the task brief. If a role is not in this
+table, stop and report that the adapter has no mapping; do not pass the canonical
+label through as a host agent name.
 
 `poteto-agent` and `comment-sicko` are custom compatibility agents for direct named seams in imported skills. A direct compatibility call may use that custom agent name; ordinary canonical routing never does.
 
 ### Planning distinction
 
-The imported warning about a built-in planning subagent describes a source-host mechanism that bypassed the skill contract. This Pi-compatible package has no bundled `plan` agent. Canonical `planner` work uses `designer` with a technical-planning brief and does not pass source-host subagent fields.
+The imported warning about a built-in planning subagent describes a source-host mechanism that bypassed the skill contract. OMP has no bundled `plan` agent. Canonical `planner` and `designer` work use `task` with a role-specific brief and do not pass source-host subagent fields.
 
 ### Security review
 
-Use `security-reviewer` for an independent security lane. Keep it read-only and separate from ordinary code review when both are required. A later `reviewer` session may synthesize frozen reports; it does not replace the primary security review.
+Use `security-reviewer` for an independent security lane when it appears in the live inventory. Keep it read-only and separate from ordinary code review when both are required. A later `reviewer` session may synthesize frozen reports; it does not replace the primary security review.
 
 ## Task contract
 
@@ -224,23 +221,27 @@ The root resolves a child question and sends the answer through `hub` `op: "send
 
 ## Model routing
 
-OMP resolves a task agent through its current settings, including `modelRoles`, `task.agentModelOverrides`, the agent definition, and normal fallback. Agent selection and model selection are separate decisions.
+OMP resolves each child model from `task.agentModelOverrides`, the agent
+definition, and its configured task/session fallback. `modelRoles` resolves
+documented aliases in those settings. Agent selection and model selection are
+separate decisions.
 
-Do not put a `model` field in a task item. Do not use a model alias as the `agent` value. Configure routing through the installed OMP settings and report the actual resolved model when independence matters.
+Do not put a `model` field in a task item. Do not use a model alias as the `agent`
+value. Report the resolved model and fallback status when available; do not claim
+model independence from the configured alias alone.
 
-Recommended role aliases:
+Recommended model-role aliases for the bundled OMP agents:
 
 | OMP agent | Recommendation |
 |---|---|
 | `scout` | `@smol` |
-| `designer` | `@designer` |
 | `reviewer` | `@advisor` |
 | `security-reviewer` | `@advisor` |
-| `librarian` | `@smol` |
 | `task` | `@task` or a stronger implementation role |
 | `sonic` | `@tiny` or `@smol` |
 
-These are recommendations, not task payload fields.
+These are configuration recommendations, not task payload fields. Roles mapped
+to the same OMP agent share the same model override.
 
 ## Writing
 
