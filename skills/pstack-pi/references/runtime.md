@@ -183,6 +183,41 @@ resource. Never scan another project or a global vendor transcript tree. If no
 transcript source is available, report the gap and continue only with evidence that
 does not require it.
 
+## OMP session recovery (v18.4.3)
+
+OMP persists root sessions as JSONL journals. The session header's `id` identifies
+the conversation; its `cwd` identifies the starting directory, not a saved Git
+branch or worktree.
+
+- Use `omp --resume <session-id-or-jsonl-path>` when the exact prior conversation
+  is known. This reopens that journal and its recorded conversation state.
+- Use `omp --continue` for the current terminal's last session, falling back to
+  the most recent session for the current cwd. A bare launch is not recovery when
+  `autoResume` is disabled; it creates a new root. Prefer an exact ID over
+  recency-based selection for a known interrupted session.
+- Reuse a custom `--session-dir` when the journal was stored there. Keep the
+  journal path or ID in a project-accessible recovery note; a fresh root's
+  `local://` artifacts are not automatically visible to another root.
+- `/handoff` is an OMP TUI command that compacts the current journal in place and
+  retains a recent tail; it does not create a new session. By default it writes no
+  standalone checkpoint. `compaction.handoffSaveToDisk` optionally writes a
+  `handoff-*.md` file. The separate `handoff` skill writes a recovery note; it does
+  not invoke OMP's `/handoff`.
+- A resumed journal is context, not proof of current repository state. Before
+  acting, verify the actual Git root, branch, `HEAD`, status, changed files, and
+  side effects. OMP does not restore an old worktree or external process merely
+  by reopening its journal.
+- Task child journals are separate from the parent. A saved child transcript or
+  result artifact does not prove that its process is still running or can be
+  resumed; inspect live job state and persisted output/patch evidence separately.
+
+For a new root that must reconstruct pstack work, use the actual playbooks
+`skill://poteto-mode/playbooks/pause-safely.md` and
+`skill://poteto-mode/playbooks/session-pickup.md`. They preserve a durable,
+workspace-scoped trail; they do not make OMP discover or resume an old root
+automatically. In this adapter, `history://` is registered-agent history, not a
+catalog of root OMP sessions.
+
 ## Long-running work and verification
 
 Use the host's durable goal, watcher, or loop facility when available. Otherwise keep
