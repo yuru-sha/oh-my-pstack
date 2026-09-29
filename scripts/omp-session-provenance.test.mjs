@@ -43,6 +43,15 @@ const session = [
       content: [{ type: "text", text: "Another invocation." }],
     },
   },
+  {
+    type: "message",
+    message: {
+      role: "assistant",
+      provider: "openai-codex",
+      model: "gpt-6-astra",
+      content: [{ type: "text", text: "The first model returns." }],
+    },
+  },
 ].map((entry) => JSON.stringify(entry)).join("\n");
 
 test("reads resolved and invoked models from persisted child session events", () => {
@@ -68,6 +77,7 @@ test("reads resolved and invoked models from persisted child session events", ()
     [
       { provider: "openai-codex", model: "gpt-6-astra" },
       { provider: "anthropic", model: "claude-sonnet-4-5" },
+      { provider: "openai-codex", model: "gpt-6-astra" },
     ],
   );
   assert.deepEqual(

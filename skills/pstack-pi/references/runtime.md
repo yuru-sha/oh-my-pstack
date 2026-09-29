@@ -106,13 +106,15 @@ is not runtime evidence.
 After an OMP Task finishes:
 
 1. Record the child task ID returned by `task`.
-2. Locate that child's persisted `<task-id>.jsonl` in the parent's session artifact directory.
-   If the parent session is `/path/<parent>.jsonl`, its artifact directory is
-   `/path/<parent>/`. A parent without a session file may use a temporary directory.
+2. Locate the matching `<task-id>.jsonl` in the parent's session artifact directory. The
+   filename uses the task ID, such as `ProvenanceChild.jsonl`. Read its session header
+   and confirm `parentSession` points to the parent session file. For `/path/parent.jsonl`,
+   the artifact directory is `/path/parent/`. A parent without a persisted session may
+   use a temporary artifact directory.
 3. Inspect every `model_change` entry in order. Preserve its `role`, `model`, and
-   `resolvedModelIsFallback`. The parser prints `null` when fallback metadata is
-   absent; report that state as unknown, never as `false`. A role-specific entry
-   such as `subagent:<task-id>` identifies the child assignment.
+   `resolvedModelIsFallback`. If fallback metadata is absent, report it as unknown,
+   never as `false`. A role-specific entry such as `subagent:<task-id>` identifies
+   the child assignment.
 4. Inspect each `model_usage` entry and keep its `purpose` and `role`. Inspect
    assistant `message` entries for `provider`, `model`, and `usage`.
 5. Report assistant invocation models in chronological order. Keep repeated entries
@@ -121,9 +123,9 @@ After an OMP Task finishes:
 6. Compare the configured selector, resolved entries, and invocation records. Do
    not infer fallback from a difference between configured and invoked values.
 
-In this repository, `node scripts/omp-session-provenance.mjs <child-session.jsonl>`
-prints the resolved events, assistant invocation metadata, and model usage events
-from a child session file. It does not read OMP configuration or child text.
+The test-only JSONL fixture in `scripts/omp-session-provenance.test.mjs` covers these
+entry types, missing fields, auxiliary usage, and model transitions. The workflow
+still reads the persisted child session as its runtime evidence.
 
 When only configuration is available, report `resolved: unavailable`,
 `invoked: unavailable`, and `fallback: unknown`. If the JSONL lacks a particular
@@ -137,10 +139,10 @@ When reporting model routing, use a compact record with `phase`, `agent`,
 Keep every model transition when a child used more than one invocation model.
 Do not require every workflow to print a provenance table.
 
-OMP reloads task routing settings before each Task spawn. In the tested runtime,
-changing `task.agentModelOverrides` applies to children spawned later in the same
-parent session. This does not claim that OMP reloads every setting or changes an
-already running child.
+OMP refreshes task routing settings before each Task spawn. A prior controlled
+same-parent test confirmed that changing `task.agentModelOverrides` applies to
+subsequently spawned children. This does not claim that OMP reloads every setting
+or changes an already running child.
 
 ## Questions and interaction
 
