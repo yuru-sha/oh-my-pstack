@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 
@@ -207,11 +207,16 @@ async function main() {
       assert.ok(child, `Missing persisted session for ${expected.name}`);
       assert.ok(child.header.cwd, `${expected.name} session has no cwd`);
       const roots = gitRootEvidence(child.entries);
+      assert.notEqual(resolve(child.header.cwd), resolve(repository), `${expected.name} did not get a separate cwd`);
+      assert.ok(isWithin(workspaces, child.header.cwd), `${expected.name} cwd is outside configured workspaces`);
       assert.equal(resolve(roots.cwd), resolve(child.header.cwd), `${expected.name} pwd differs from session cwd`);
       const relativeRoot = relative(workspaces, child.header.cwd);
+      assert.ok(relativeRoot && relativeRoot !== ".." && !relativeRoot.startsWith(`..${sep}`), `${expected.name} cwd is not under configured workspaces`);
       const gitRootSuffix = relativeRoot.split(sep).join("/");
       const gitRootPath = roots.gitRoot.split(sep).join("/");
       assert.ok(gitRootPath.endsWith(gitRootSuffix), `${expected.name} Git root does not match its isolated workspace`);
+      const gitRootBase = roots.gitRoot.slice(0, roots.gitRoot.length - relativeRoot.length - 1);
+      assert.equal(await realpath(gitRootBase), await realpath(workspaces), `${expected.name} Git root resolves outside configured workspaces`);
       isolatedRoots.add(resolve(child.header.cwd));
 
       const paths = toolPaths(child.entries);
