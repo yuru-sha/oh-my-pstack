@@ -44,6 +44,7 @@
   "scripts": {
     "verify": "node scripts/verify.mjs",
     "test:sync": "node --test scripts/sync-upstream.test.mjs scripts/skill-references.test.mjs scripts/omp-session-provenance.test.mjs",
+    "test:omp-isolation": "node scripts/omp-isolation-smoke.mjs",
     "sync:check": "node scripts/sync-upstream.mjs --check",
     "sync:apply": "node scripts/sync-upstream.mjs --apply"
   }
