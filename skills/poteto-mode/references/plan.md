@@ -22,7 +22,7 @@ Resolve what is in scope vs explicitly out, technical or platform constraints, p
 
 ## 3. Explore through the active adapter
 
-Delegate codebase exploration (the **guard-the-context-window** principle skill) with the canonical `explorer` role and the active adapter's **Panel** protocol. Start every independent slice before waiting. The adapter owns concrete role and model routing.
+Delegate codebase exploration (the **guard-the-context-window** principle skill) with the canonical `explorer` role and the active adapter's **Panel** protocol. Start every independent slice before waiting. The adapter owns concrete role and model routing; consult its capability matrix for what batch spawn, `wait`, peer messaging, and follow-up actually support.
 
 Each explorer returns file pointers, conventions, dependencies, test infrastructure, and entry points. No inlined dumps.
 

@@ -99,7 +99,7 @@ Use these canonical roles:
 | `owner` | Coupled multi-step implementation that benefits from retained session context. |
 | `watcher` | One exact generation or external-state transition, then terminate. |
 
-Use only these canonical lifecycle protocols: **Bounded session**, **Panel**, **Long-lived owner**, and **One-shot watcher**. Their mechanics live in the active adapter. Start every Panel participant before waiting for any result. Keep implementers, reviewers, judges, and synthesizers separate. A child never starts another child; it returns proposed briefs to the root.
+Use only these canonical lifecycle protocols: **Bounded session**, **Panel**, **Long-lived owner**, and **One-shot watcher**. Their mechanics live in the active adapter. Start every Panel participant before waiting for any result. Keep implementers, reviewers, judges, and synthesizers separate. A child never starts another child; it returns proposed briefs to the root. Each protocol's actual capability, including what "long-lived" means on the active host, comes from the adapter's capability matrix; pstack terminology does not survive translation unchanged.
 
 Pass concise file pointers and explicit worktree or output paths. Review every artifact and run parent verification. Use a fresh session when the unit or role changes. Agreement across independent sessions is useful evidence, not proof. Model selection belongs to the active runtime's role configuration, not the routed skill.
 

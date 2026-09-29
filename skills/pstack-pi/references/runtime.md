@@ -289,6 +289,32 @@ A non-isolated Task that finishes without a hard abort leaves its agent session 
 
 If peer messaging is unavailable in the sender's session, `write agent://` fails; an unknown or aborted recipient also fails, and a missing or reaped process ID returns not-found instead of falling back to another API. Keep the state unknown, preserve existing artifacts, and resolve prior ownership before starting a fresh Task with a complete handoff.
 
+### Capability matrix (semantic, not command-shaped)
+
+| Capability | Status | Authoritative mechanism | Notes |
+|---|---|---|---|
+| spawn (single) | SUPPORTED | `task` flat shape | returns `details.async.jobId` + `details.progress[0].id` when `async.enabled=true` |
+| spawn (panel batch) | SUPPORTED | `task` batch shape `{ context, tasks[] }` | `context` required, per-item `agent` and `task` and `solutionSpace` |
+| result delivery | SUPPORTED | auto-delivered `async-result` + `agent://<id>` artifact | full output at `agent://<id>`; preview at `details.results[].output` |
+| observe running | PARTIALLY SUPPORTED | `read proc://<jobId>` for job state; `read history://<id>` for transcript | job state may be stale; transcript presence is not liveness |
+| wait (targeted, ID-bearing) | NOT SUPPORTED | `wait` accepts no IDs | use repeated `wait` while blocked; account for every settled participant |
+| wait (barrier / event) | SUPPORTED (with limits) | no-arg `wait`, 30-minute safety cap | returns "Nothing to wait for" when no owned work |
+| send to running worker | SUPPORTED (caveats) | `write agent://<id>` peer message | delivery ≠ acknowledgment; not a tool interrupt; long-running shell can run while message is handled |
+| follow-up after completion (idle) | SUPPORTED (TTL-bounded) | `write agent://<id>` reaches idle agent | default `task.agentIdleTtlMs = 420000` ms |
+| follow-up after completion (parked) | PARTIALLY SUPPORTED | `write agent://<id>` revives parked agent | revival requires a rebuildable reviver + workspace |
+| follow-up after abort | NOT SUPPORTED | `aborted` is terminal | delayed work from killed generation cannot transition back |
+| follow-up to an isolated Task | NOT SUPPORTED | isolated Task sessions torn down at run end | transcript readable via `history://<id>`; no live session |
+| cancel (running job) | SUPPORTED (cooperative only) | `write proc://<jobId>/kill` no content | job → `cancelled`; child → `aborted`; not a checkpoint/rollback; child mid-shell may not honor the kill promptly |
+| cancel (idle registration) | SUPPORTED (caveats) | same kill target on idle row | may release session while row stays `completed`; later returns not-found |
+| long-lived owner (continuous live process) | NOT SUPPORTED | no always-on child process | status oscillates `running → idle → parked → aborted` |
+| long-lived owner (same persisted session across idle/parked) | PARTIALLY SUPPORTED | `write agent://<id>` revives when conditions hold | subject to peer messaging, idle TTL, revival success |
+| long-lived owner (new child reading prior transcript) | SUPPORTED | fresh `task` with full handoff; `history://<oldId>` for context | the durable substitute when persisted session is gone |
+| hub (TUI roster) | SUPPORTED (human-facing only) | Agent Hub Alt+A / Ctrl+S / double-tap ← | not a `hub` tool API |
+| hub (programmatic) | NOT SUPPORTED | use `proc://`, `agent://`, `history://`, `wait` directly | no umbrella `hub` tool API |
+| live child status (registry) | NOT DIRECTLY EXPOSED | registry status `running \| idle \| parked \| aborted` is internal | use `proc://`/`history://` as evidence with caveats |
+
+`SUPPORTED` means the runtime can do this directly. `PARTIALLY SUPPORTED` means the runtime can do it under documented conditions (TTL, peer-messaging availability, isolated-mode, etc.). `NOT SUPPORTED` means the runtime cannot do this; do not invent a host tool or assume pstack terminology survives translation. `NOT DIRECTLY EXPOSED` means the underlying state exists but no host surface exposes it directly; use the listed proxy surfaces with their documented caveats.
+
 ## OMP v18.4.3 contract sources
 
 - [Task tool](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/tools/task.md), [wait tool](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/tools/wait.md), and [Agent Hub](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/agent-hub.md).

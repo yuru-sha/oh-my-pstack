@@ -90,10 +90,10 @@ Use `outputSchema` only when the coordinator needs a machine-readable result. Se
 ## 4. Coordinate
 
 - Results auto-deliver. Continue handling user messages and independent root work instead of polling continuously.
-- Use `write agent://<id>` for a bounded sibling message only when OMP peer messaging is available. A delivery receipt is not an acknowledgment or an immediate interrupt.
-- OMP `wait` takes no IDs and wakes for the next owned Task result or peer message, consuming returned events; it may return multiple concurrently settled jobs. Results may auto-deliver; call `wait` only when blocked and repeat to drain required work.
-- Use `read proc://` or `read proc://<jobId>` for background-job status/output. A completed job row is not proof that the child session still exists; a listed `running` registration may also be stale.
-- Use `write proc://<jobId>/kill` with no content only to abort an owned job after checking its safe boundary. OMP has no `hub` tool API; `agent://<id>` is the saved Task result and later replies remain in `history://<id>`, a transcript rather than live execution evidence. See the [OMP Task lifecycle contract](../pstack-pi/references/runtime.md#omp-task-lifecycle-and-interaction-v1843).
+- Use `write agent://<id>` for a bounded sibling message only when OMP peer messaging is available, only for an `idle` or revivable `parked` child, and only while the unit is still actionable. A delivery receipt is not an acknowledgment, an immediate interrupt, or proof the child handled the message. Follow-ups do not reach `aborted` or `isolated` sessions; resolve prior ownership and start a fresh Task with a complete handoff instead.
+- OMP `wait` takes no IDs and wakes for the next owned Task result or peer message, consuming returned events; a single `wait` may return multiple concurrently settled jobs. Results may auto-deliver; call `wait` only when blocked and repeat to drain required work, but never as an ID-targeted poll.
+- Use `read proc://` or `read proc://<jobId>` for background-job status/output. A completed job row is not proof that the child session still exists; a listed `running` registration may also be stale. Use `read history://<id>` for the rendered transcript; neither file presence nor history timestamps prove current liveness.
+- Use `write proc://<jobId>/kill` with no content only to abort an owned job after checking its safe boundary. Cancellation is not a checkpoint or rollback; preserve partial work before killing. OMP has no `hub` tool API; `agent://<id>` is the saved Task result and later replies remain in `history://<id>`, a transcript rather than live execution evidence. See the [OMP Task lifecycle contract](../pstack-pi/references/runtime.md#omp-task-lifecycle-and-interaction-v1843) and the [capability matrix](../pstack-pi/SKILL.md#capabilities-and-limits) for what OMP actually supports.
 
 ## 5. Integrate
 

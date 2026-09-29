@@ -1,6 +1,6 @@
 ---
 name: pstack-pi
-description: "Pi runtime adapter for poteto-mode. Maps canonical pstack roles and lifecycle protocols to Pi-compatible task agents, batching, isolation, follow-ups, and durable result resources."
+description: "Pi runtime adapter for poteto-mode. Maps canonical pstack roles and lifecycle protocols to Pi-compatible task agents, batching, isolation, TTL-bounded persisted-session follow-ups, and durable result resources."
 ---
 
 # pstack on Pi
@@ -25,7 +25,7 @@ contract.
 | `researcher` | `task` | Source-verified external library, framework, API, protocol, or version research. |
 | `synthesizer` | `reviewer` | Cross-report synthesis, adjudication, and advisory judgment over frozen evidence. |
 | `implementer` | `task` | Bounded implementation or test changes with explicit write ownership. |
-| `owner` | `task` | One coupled multi-step implementation session retained through IRC follow-ups. |
+| `owner` | `task` | One coupled multi-step implementation session. Retention runs through OMP's persisted-session lifecycle (`running → idle → parked → aborted`), not a continuously working child process. See the Long-lived owner protocol below for the capability limits. |
 | `mechanical` | `sonic` | Fully specified low-judgment edits. Ambiguity returns to the root. |
 
 The OMP bundled task agents are `scout`, `reviewer`, `security-reviewer`,
@@ -116,6 +116,36 @@ OMP 18.4.3 Task results may auto-deliver. Record the semantic name, agent ID, an
 
 A task result is evidence, not completion. The root inspects the artifact and runs verification.
 
+## Capabilities and limits
+
+Map semantics to OMP, not to pstack terminology. A capability that does not exist on OMP must fail closed, not be approximated. The Agent Hub is a human-facing TUI; model-facing control lives in `proc://`, `agent://`, `history://`, and `wait`.
+
+| pstack concept | OMP capability | Mechanism |
+|---|---|---|
+| spawn (single) | SUPPORTED | `task` flat shape: `{ name, agent, task, solutionSpace, ... }` |
+| spawn (panel batch) | SUPPORTED | `task` batch shape: `{ context, tasks[] }` |
+| result delivery | SUPPORTED | Auto-delivery as an `async-result`; artifact at `agent://<id>` |
+| observe running | PARTIALLY SUPPORTED | `read proc://<jobId>` for job state (a `running` row may be stale); `read history://<id>` for live or parked transcript |
+| wait (targeted, ID-bearing) | NOT SUPPORTED | `wait` accepts no IDs; it wakes on the next settled owned job, peer message, or owned-service completion, and may return multiple concurrently settled jobs at once. Use repeated `wait` calls to drain required work, never as an ID-targeted poll. |
+| wait (barrier / event) | SUPPORTED (with limits) | Repeated no-arg `wait` while blocked. One 30-minute safety cap, then a still-running snapshot. |
+| send to running worker | SUPPORTED (caveats) | `write agent://<id>` peer message. Delivery is not an acknowledgment or interrupt to a running tool; the child may defer until the tool returns, or handle the message while a backgrounded shell continues running. |
+| follow-up after completion (idle) | SUPPORTED (TTL-bounded) | Same `write agent://<id>` to the same agent ID reaches the idle session until `task.agentIdleTtlMs` (default 420000 ms) expires. |
+| follow-up after completion (parked) | PARTIALLY SUPPORTED | `write agent://<id>` revives a parked agent only when OMP can rebuild its reviver and workspace; transcript discovery alone is not enough. |
+| follow-up after abort | NOT SUPPORTED | `aborted` is terminal — a killed generation cannot transition back. |
+| follow-up to an isolated Task | NOT SUPPORTED | Isolated Task sessions are torn down at run end (parked without reviver; workspace merged and cleaned). The transcript stays readable at `history://<id>`, but no further `write agent://` reaches a live session. |
+| cancel (running job) | SUPPORTED (cooperative only) | `write proc://<jobId>/kill` with no content. The job reports `cancelled`; the child becomes terminal `aborted`. Cancellation is not a checkpoint or rollback — partial tool output and transcripts may remain. |
+| cancel (idle registration) | SUPPORTED (caveats) | Killing a retained idle registration may release that session while its job row stays `completed`; after the row is reaped, the target returns not-found. |
+| long-lived owner (continuous live process) | NOT SUPPORTED | OMP has no always-on child process. A child transitions `running → idle → parked → aborted`. There is no equivalent of a long-lived worker that keeps polling or executing between root messages. |
+| long-lived owner (same persisted session across idle/parked) | PARTIALLY SUPPORTED | `write agent://<id>` to an idle session; same to a parked session when revival succeeds. Subject to idle TTL, peer-messaging availability, and revival conditions. |
+| long-lived owner (new child reading prior transcript) | SUPPORTED | Fresh `task` call with a complete handoff; the prior transcript lives at `history://<oldId>`. |
+| hub (TUI roster) | SUPPORTED (human-facing only) | Agent Hub opens through `Alt+A` / `Ctrl+S` / double-tap ←. It is a TUI roster and control surface, not a `hub` tool API. |
+| hub (programmatic) | NOT SUPPORTED | Use `proc://`, `agent://`, `history://`, and `wait` directly. No umbrella `hub` tool API. |
+| live child status (registry) | NOT DIRECTLY EXPOSED | Status (`running`, `idle`, `parked`, `aborted`) is registry-internal. Use `read proc://<jobId>` for job state and `read history://<id>` for the rendered transcript; treat both as evidence subject to the staleness rules, not as authoritative liveness. |
+
+`SUPPORTED` means the runtime can do this directly. `PARTIALLY SUPPORTED` means the runtime can do it under documented conditions (TTL, peer-messaging availability, isolated-mode, etc.). `NOT SUPPORTED` means the runtime cannot do this; do not invent a host tool or assume pstack terminology survives translation. `NOT DIRECTLY EXPOSED` means the underlying state exists but no host surface exposes it directly; use the listed proxy surfaces with their documented caveats.
+
+Fail closed on every NOT SUPPORTED row. Do not invent a host tool name or assume pstack terminology survives translation. When peer messaging is unavailable, the `write agent://` surface fails; resolve prior ownership and start a fresh Task with a complete handoff instead.
+
 ## Brief shape
 
 A dispatch is forbidden until its brief contains:
@@ -156,10 +186,10 @@ Copy the active playbook's standing policy text verbatim when it supplies one.
 
 1. Author one standalone brief.
 2. Start one task with the mapped agent.
-3. Record its semantic name, agent ID, job ID, role, scope, isolation mode, base SHA, and expected artifact.
-4. Consume the async result when delivered; use no-argument `wait` only when blocked.
-5. Read `agent://<agentId>`; inspect `history://<agentId>` for transcript context, not liveness.
-6. Send one bounded `write agent://<agentId>` correction only within the same unit and only when peer messaging is available.
+3. Record its semantic name, agent ID, job ID, role, scope, isolation mode, base SHA, and expected artifact. Agent ID and job ID are separate identifiers; do not assume they are interchangeable.
+4. Consume the async result when delivered; use no-argument `wait` only when blocked. A settled result moves the child from `running` to `idle` (or `aborted` on hard failure). The result artifact at `agent://<agentId>` is now frozen.
+5. Read `agent://<agentId>` for the saved result artifact; inspect `history://<agentId>` for the full transcript including any follow-up replies. Neither proves current liveness; both can outlive the child.
+6. Send one bounded `write agent://<agentId>` correction only when peer messaging is available and only while the unit is still actionable: a still-running child that has not yet yielded, or an idle child whose idle TTL has not yet expired. Do not rely on delivery as an interrupt to a running tool — the child may handle it after the tool returns. Once the child yields and the result auto-arrives, the unit is closed; further work routes through a fresh task or through the [Long-lived owner](#long-lived-owner) protocol. For an idle child past its TTL, route the next unit through the Long-lived owner protocol or start a fresh Task with a complete handoff.
 7. Inspect the artifact and independently run the promised verification.
 8. Accept the unit only after the parent verifies the reported output.
 
@@ -170,7 +200,7 @@ A role or unit change requires a fresh task.
 1. Partition independent slices or race arms with one task per participant.
 2. Start every participant in one batch before consuming any result.
 3. Track participants by semantic name and identifiers, never arrival order.
-4. Track each returned job ID; let results auto-deliver and use repeated no-argument `wait` calls only while blocked. `wait` cannot select IDs; account for every required participant's terminal result or explicitly record its cancellation/gap. Use `write proc://<jobId>/kill` only to abort a stale job after checking its safe boundary.
+4. Track each returned job ID; let results auto-deliver and use repeated no-argument `wait` calls only while blocked. A single `wait` may return multiple concurrently settled jobs or peer messages at once; consume every event it returns and account for every required participant. `wait` cannot select IDs; do not poll for a single participant's completion by calling `wait` repeatedly. Record every cancellation or gap explicitly. Use `write proc://<jobId>/kill` only to abort a stale job after checking its safe boundary.
 5. Ignore duplicate terminal delivery.
 6. Freeze implementation artifacts, branches, head SHAs, reports, and hashes.
 7. Start every independent reviewer in a new batch only after the candidates are frozen.
@@ -181,11 +211,19 @@ Do not mix implementers, reviewers, or synthesizers in one session. Do not let r
 
 ### Long-lived owner
 
-1. Start one non-isolated `task` session with the complete owner brief.
-2. Record its agent ID and job ID separately; use the agent ID for follow-up and the job ID for process control, even if they match. A completed Task leaves an idle session, not a continuously working child.
+OMP supports three distinct retention models; the protocol name collapses them only because each is the closest equivalent to pstack's "long-lived owner". They are not interchangeable.
+
+- **Same live process** is NOT SUPPORTED. There is no always-on child process. The owner session oscillates between `running`, `idle`, and `parked`. Do not promise the root that the owner is continuously executing between root messages.
+- **Same persisted session** is PARTIALLY SUPPORTED. A non-isolated Task that finishes without a hard abort leaves its agent session `idle` (live) for `task.agentIdleTtlMs` (default 420000 ms in v18.4.3); on expiry it parks (live session disposed, ref + sessionFile retained). A parked child revives only when OMP can rebuild its reviver and workspace. Discovery of the transcript alone is not enough.
+- **New child reading prior transcript** is SUPPORTED. A fresh `task` call with a complete handoff reads `history://<oldId>` for prior context. This is the durable substitute when the persisted session is gone or unavailable.
+
+Protocol:
+
+1. Start one non-isolated `task` session with the complete owner brief. Do not use `isolated: true` — isolated Task sessions are not reusable.
+2. Record its agent ID and job ID separately; use the agent ID for follow-up and the job ID for process control, even if they match. The semantic name is the role's working identity; treat the agent ID as the persisted-session identifier; treat the job ID as the per-spawn process handle. A settled Task moves the child from `running` to `idle` (or `aborted` on hard failure); it is never a continuously working child.
 3. The owner works only in its assigned branch and paths and never starts children.
-4. Send a `write agent://<agentId>` follow-up only for the next coupled phase, an in-scope correction, an evidence-based answer, or explicit authorization, and only while OMP peer messaging is available.
-5. OMP's configured idle TTL (420000 ms by default in v18.4.3) parks the session. A parked child may revive through `write agent://<agentId>` only when its persisted reviver and workspace are available; otherwise reconcile that the old child is quiescent and its partial state before starting a fresh Task with a complete handoff. Isolated Task sessions are not reusable.
+4. Send a `write agent://<agentId>` follow-up only for the next coupled phase, an in-scope correction, an evidence-based answer, or explicit authorization, and only while OMP peer messaging is available. Follow-ups reach `idle` and revivable `parked` sessions; they do not reach `aborted` or `isolated` sessions, and they are not a tool interrupt while a child is mid-turn. If the unit has aborted, or peer messaging is unavailable, resolve prior ownership and start a fresh Task with a complete handoff instead.
+5. OMP's configured idle TTL parks the session. A parked child may revive through `write agent://<agentId>` only when its persisted reviver and workspace are available; otherwise reconcile that the old child is quiescent and capture its partial state before starting a fresh Task with a complete handoff. Isolated Task sessions are not reusable.
 6. Require a terminal report at each verification boundary.
 7. Independently verify the boundary before authorizing the next phase.
 8. Stand down on ownership violation, stale generation, or terminal scope breach.
@@ -205,7 +243,7 @@ A watcher observes. It does not fix, merge, authorize, or silently follow a chan
 
 Children resolve uncertainty from source, standing policy, frozen evidence, or the brief. Otherwise they use the safest reversible interpretation and report the assumption, or return `BLOCKED` with the exact missing decision and evidence gathered.
 
-The root resolves a child question and sends the answer through `write agent://<agentId>` when OMP peer messaging is available. Otherwise, use a fresh Task only after the previous child is quiescent and its partial state is reconciled, or handle the decision at the root; never invent a `hub` send operation.
+The root resolves a child question by sending the answer through `write agent://<agentId>` only when OMP peer messaging is available and only for an `idle` or revivable `parked` child. Delivery is not a tool interrupt and is not proof the child handled the message. If peer messaging is unavailable, the child has aborted, or the session is `isolated`, use a fresh Task only after the previous child is quiescent and its partial state is reconciled, or handle the decision at the root; never invent a `hub` send operation, never rely on `agent://` or `history://` presence as proof of liveness, and never describe a settled result as a live worker.
 
 ## Ownership and verification
 
