@@ -63,14 +63,13 @@ When the flat schema is active:
 {
   "name": "parser-overflow-worker",
   "agent": "task",
-  "task": "GOAL\n...\n\nROLE\n...\n\nSCOPE\n...\n\nCONTEXT\n...\n\nACCEPTANCE\n...\n\nVERIFY\n...\n\nTIMEBOX\n...\n\nFORBIDDEN\n...\n\nREPORT\n...\n\nSTANDING\n...",
-  "isolated": true
+  "task": "GOAL\n...\n\nROLE\n...\n\nSCOPE\n...\n\nCONTEXT\n...\n\nACCEPTANCE\n...\n\nVERIFY\n...\n\nTIMEBOX\n...\n\nFORBIDDEN\n...\n\nREPORT\n...\n\nSTANDING\n..."
 }
 ```
 
 When batch mode is active, use a one-item `tasks[]` call instead of inventing a per-call batch switch.
 
-Use `isolated: true` for a writer that needs a dedicated worktree. Read the returned isolation metadata and verify the patch, branch, or applied change the host reports. Use a non-isolated session for a long-lived owner that must accept follow-ups in the same workspace.
+Ordinary single-writer work, shared read-only work, and research alongside one writer do not need a worktree. Concurrent writers require separate actual execution roots or proven non-overlapping write sets; if neither is available, fail closed. Do not add `isolated:false` to express the default. Native isolation is usable only when the live schema exposes it, `task.isolation.enabled` is true, and plan mode is off. `isolated:true` selects a separate workspace, not a Git worktree or filesystem sandbox. See [OMP Task workspace roots](references/runtime.md#omp-task-workspace-roots-v1842) for root assignment, baseline checks, and safe integration.
 
 ### Batched panel
 
@@ -83,14 +82,12 @@ Use one batch call for independent participants:
     {
       "name": "candidate-a",
       "agent": "task",
-      "task": "ROLE: planner. Standalone brief for technical architecture candidate A.",
-      "isolated": false
+      "task": "ROLE: planner. Standalone brief for technical architecture candidate A."
     },
     {
       "name": "candidate-b",
       "agent": "task",
-      "task": "ROLE: designer. Standalone brief for product-design candidate B.",
-      "isolated": false
+      "task": "ROLE: designer. Standalone brief for product-design candidate B."
     }
   ]
 }
@@ -98,7 +95,7 @@ Use one batch call for independent participants:
 
 Each `name` is unique. `context` contains common immutable material. Each item still names its exact role, slice, acceptance criteria, verification, forbidden work, and report contract.
 
-Start every participant in one batch before consuming any verdict. Separate writers with isolated workspaces or disjoint output paths. Freeze candidate artifacts before starting reviewers. Freeze reviewer reports before starting a separate synthesizer session.
+Start every participant in one batch before consuming any verdict. Concurrent writers need separate actual execution roots or proven non-overlapping write sets; fail closed if neither is available. Freeze candidate artifacts before starting reviewers. Freeze reviewer reports before starting a separate synthesizer session.
 
 ### Background completion and follow-ups
 
@@ -208,10 +205,10 @@ The root resolves a child question and sends the answer through `hub` `op: "send
 
 ## Ownership and verification
 
-- One writer per branch, worktree, mutable state, and output path.
+- One writer per branch and mutable state; concurrent writers may share a root only with proven non-overlapping write sets.
 - Separate sessions own implementation, review, judgment, and synthesis.
 - A task stays inside its assigned unit and role.
-- Isolate concurrent writers unless their outputs are structurally disjoint.
+- Concurrent writers need separate actual execution roots or proven non-overlapping write sets; fail closed if neither is available.
 - A worker's report never verifies its own work.
 - Record branch, base SHA, and exact head SHA or artifact generation.
 - Prefer behavioral proof over type-check-only evidence.

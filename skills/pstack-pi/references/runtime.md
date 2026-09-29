@@ -192,3 +192,47 @@ only a fallback. Re-arm a watcher after every state-changing wave.
 The root coordinator owns user interaction, approvals, integration, and final
 verification. A worker report is evidence, not proof. The root must inspect artifacts
 and run the promised checks on the integrated result.
+
+## OMP Task workspace roots (v18.4.2)
+
+In the checked OMP v18.4.2 runtime, a Task's cwd comes from the parent session
+unless native isolation is selected. Creating an OMP worktree does not rebind the
+parent session or a later Task; relative file-tool paths follow the child session
+root. A result path such as `local://...` or `agent://...` is an artifact channel,
+not evidence of the child's cwd or source root.
+
+The Task API has no caller-supplied cwd or existing-worktree path. `isolated:true`
+creates an OMP-managed temporary root from the parent repository at dispatch.
+Record the task ID and parent root/HEAD. When a child session log is available,
+verify its `cwd` and `parentSession`, the child's Git root/HEAD, and actual
+resolved file-tool paths before accepting changes. Treat returned patch/branch
+paths as result artifacts, not workspace roots.
+
+Native `isolated:true` is available only when the live Task schema exposes it and
+`task.isolation.enabled` is true, with plan mode off. It separates workspace roots;
+it is not a Git worktree or OS filesystem sandbox, and does not promise containment
+for absolute paths, `..`, symlinks, or external effects. To keep a verification
+run from auto-applying successful isolated changes, set
+`task.isolation.apply: false` in OMP settings. This is a setting, not a Task item
+argument; its default is `true`. Inspect returned patch or branch metadata and
+integrate deliberately.
+
+Single writers may use the current checkout; shared read-only work and research
+alongside one writer need no worktree. Concurrent writers require separate actual
+execution roots or proven non-overlapping write sets. If neither is available,
+fail closed rather than dispatching writers into a shared checkout.
+
+Before dispatch, capture this parent baseline:
+
+```bash
+git rev-parse --show-toplevel
+git rev-parse HEAD
+git status --porcelain=v1 --untracked-files=all
+git diff --binary HEAD | git hash-object --stdin
+```
+
+Repeat and compare all four outputs after children finish. The digest covers
+tracked content, including dirty files; status lists untracked paths, not their
+content. Git status and diff omit ignored files and external state. Preserve or
+fingerprint any untracked or ignored/generated path the child may touch. If the
+parent changes unexpectedly, stop and preserve the evidence; do not auto-revert.
