@@ -82,14 +82,14 @@ Use one batch call for independent participants:
   "tasks": [
     {
       "name": "candidate-a",
-      "agent": "designer",
-      "task": "Standalone brief for architecture candidate A.",
+      "agent": "task",
+      "task": "ROLE: planner. Standalone brief for technical architecture candidate A.",
       "isolated": false
     },
     {
       "name": "candidate-b",
-      "agent": "designer",
-      "task": "Standalone brief for architecture candidate B.",
+      "agent": "task",
+      "task": "ROLE: designer. Standalone brief for product-design candidate B.",
       "isolated": false
     }
   ]
@@ -217,7 +217,7 @@ The root resolves a child question and sends the answer through `hub` `op: "send
 - Prefer behavioral proof over type-check-only evidence.
 - A new commit, restack, conflict resolution, or applied patch creates a new generation that voids the prior verdict.
 - Judges and synthesizers advise. The root owns selection, user interaction, external writes, merges, deletion, and final truth.
-- Claim model independence only from returned resolved-model and fallback metadata.
+- Claim model independence only from each child's persisted resolution and invocation evidence. Configured aliases alone do not prove it.
 
 ## Model routing
 
@@ -227,8 +227,10 @@ documented aliases in those settings. Agent selection and model selection are
 separate decisions.
 
 Do not put a `model` field in a task item. Do not use a model alias as the `agent`
-value. Report the resolved model and fallback status when available; do not claim
-model independence from the configured alias alone.
+value. Treat `.omp/config.yml` as expected routing, not proof of execution. Report
+actual model usage from the child's persisted session JSONL; never let the child's
+self-report override `model_change`, fallback metadata, or invocation records. Use
+the [OMP child model provenance procedure](references/runtime.md#omp-child-model-provenance).
 
 Recommended model-role aliases for the bundled OMP agents:
 

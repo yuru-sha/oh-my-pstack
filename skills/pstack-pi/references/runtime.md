@@ -91,6 +91,57 @@ The optional configuration path is `$PSTACK_CONFIG`. If it is unset, use
 `.pstack/config.md` in the current project for project-local settings. Do not write
 to a vendor-specific home directory unless the host explicitly asks for it.
 
+## OMP child model provenance
+
+Report configured, resolved, and invoked models as separate facts. Child self-report
+is not runtime evidence.
+
+| Evidence | Source | Meaning |
+|---|---|---|
+| Configured | `.omp/config.yml` `task.agentModelOverrides`, agent definition, or `modelRoles` | Expected routing only. It does not prove that a child ran or which model it invoked. |
+| Resolved | Child session JSONL `model_change` and `resolvedModelIsFallback` | The model OMP resolved for that child session, with fallback state when recorded. |
+| Invoked | Assistant `message.provider` and `message.model`; `model_usage` with `purpose` and `role` | Assistant message metadata identifies each invocation. Keep auxiliary usage records separate. |
+| Self-reported | Child text | A claim by the child. Never use it to override persisted runtime evidence. |
+
+After an OMP Task finishes:
+
+1. Record the child task ID returned by `task`.
+2. Locate that child's persisted `<task-id>.jsonl` in the parent's session artifact directory.
+   If the parent session is `/path/<parent>.jsonl`, its artifact directory is
+   `/path/<parent>/`. A parent without a session file may use a temporary directory.
+3. Inspect every `model_change` entry in order. Preserve its `role`, `model`, and
+   `resolvedModelIsFallback`. The parser prints `null` when fallback metadata is
+   absent; report that state as unknown, never as `false`. A role-specific entry
+   such as `subagent:<task-id>` identifies the child assignment.
+4. Inspect each `model_usage` entry and keep its `purpose` and `role`. Inspect
+   assistant `message` entries for `provider`, `model`, and `usage`.
+5. Report assistant invocation models in chronological order. Keep repeated entries
+   when the model changes away and back. Summarize one model only when every
+   invocation agrees. Keep auxiliary `model_usage` calls separate.
+6. Compare the configured selector, resolved entries, and invocation records. Do
+   not infer fallback from a difference between configured and invoked values.
+
+In this repository, `node scripts/omp-session-provenance.mjs <child-session.jsonl>`
+prints the resolved events, assistant invocation metadata, and model usage events
+from a child session file. It does not read OMP configuration or child text.
+
+When only configuration is available, report `resolved: unavailable`,
+`invoked: unavailable`, and `fallback: unknown`. If the JSONL lacks a particular
+event type, report only that field as unavailable and retain other observed
+provenance. If the child JSONL cannot be located or contains no model evidence,
+report `unavailable`; do not substitute `.omp/config.yml`, Task's textual output,
+or the child's self-report.
+
+When reporting model routing, use a compact record with `phase`, `agent`,
+`canonical role`, `configured`, `resolved`, `invoked`, `fallback`, and `evidence`.
+Keep every model transition when a child used more than one invocation model.
+Do not require every workflow to print a provenance table.
+
+OMP reloads task routing settings before each Task spawn. In the tested runtime,
+changing `task.agentModelOverrides` applies to children spawned later in the same
+parent session. This does not claim that OMP reloads every setting or changes an
+already running child.
+
 ## Questions and interaction
 
 Use the host's structured user-interaction tool when it exists. Otherwise ask one

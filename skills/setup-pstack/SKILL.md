@@ -165,13 +165,15 @@ task:
   agentModelOverrides:
     scout: <explorer-model>
     reviewer: <reviewer-model>
+    security-reviewer: <reviewer-model>
     task: <implementer-model>
     sonic: <mechanical-model>
 ```
 
 Only include agents present in the live inventory and models confirmed by the
-host. Configure `security-reviewer` separately only when its review role needs a
-model different from `reviewer`.
+host. Configure `security-reviewer` with the selected review model when both
+review lanes should share it. OMP does not inherit the `reviewer` override for
+another agent name.
 
 For Pi with `pi-subagents`, also preserve unrelated keys and update the project's
 `.pi/settings.json` with the concrete model assignments for the discovered
@@ -217,6 +219,11 @@ route child models by agent name. For Pi, name both `.pstack/config.md` and
 live mapping. For OpenCode, name the `opencode.json` or `opencode.jsonc` path
 used. State that configuration does not create models, child agents, permissions,
 or delegation facilities.
+
+For OMP, label values in `.pstack/config.md` and `.omp/config.yml` as configured
+models. Do not copy them into resolved or invoked fields. To report a completed
+child's runtime model, inspect its persisted session JSONL using the
+[OMP child model provenance procedure](../pstack-pi/references/runtime.md#omp-child-model-provenance).
 
 If the host lacks per-child model selection, report that no role configuration
 was written or activated. Name the missing capability. Only explain how to switch
