@@ -196,6 +196,13 @@ bunx tsc --project skills/poteto-mode/scripts/watch-pr/tsconfig.json --noEmit --
 `npm run verify` checks skill inventory, frontmatter, local references, manifests,
 the upstream lock, and forbidden vendor-specific runtime bindings.
 
+The opt-in live Task interaction smoke requires OMP 18.4.3 and a configured model;
+it uses a disposable temporary Git fixture and makes a real model call:
+
+```bash
+PSTACK_OMP_SMOKE_MODEL=provider/model npm run test:omp-task-semantics
+```
+
 ## Host contract
 
 Read `skills/pstack-pi/references/runtime.md` before adapting a workflow to a new

@@ -63,6 +63,7 @@ When the flat schema is active:
 {
   "name": "parser-overflow-worker",
   "agent": "task",
+  "solutionSpace": "one self-contained task with explicit acceptance criteria",
   "task": "GOAL\n...\n\nROLE\n...\n\nSCOPE\n...\n\nCONTEXT\n...\n\nACCEPTANCE\n...\n\nVERIFY\n...\n\nTIMEBOX\n...\n\nFORBIDDEN\n...\n\nREPORT\n...\n\nSTANDING\n..."
 }
 ```
@@ -82,11 +83,13 @@ Use one batch call for independent participants:
     {
       "name": "candidate-a",
       "agent": "task",
+      "solutionSpace": "one independent candidate brief with explicit acceptance criteria",
       "task": "ROLE: planner. Standalone brief for technical architecture candidate A."
     },
     {
       "name": "candidate-b",
       "agent": "task",
+      "solutionSpace": "one independent candidate brief with explicit acceptance criteria",
       "task": "ROLE: designer. Standalone brief for product-design candidate B."
     }
   ]
@@ -99,16 +102,16 @@ Start every participant in one batch before consuming any verdict. Concurrent wr
 
 ### Background completion and follow-ups
 
-Background task results arrive through the host's async result delivery. Record the returned job and agent identifiers. The preview may be truncated.
+OMP 18.4.3 Task results may auto-deliver. Record the semantic name, agent ID, and job ID separately; do not assume their identifiers are interchangeable.
 
-- Read the full result from `agent://<id>`.
-- Read the session transcript from `history://<id>` when the report is incomplete, ambiguous, or suspicious.
-- Use `hub` with `op: "jobs"` to inspect jobs and `op: "wait"` with `ids` to wait for specific job IDs.
-- Use `hub` with `op: "list"` to inspect peers and `op: "send"` with `to` for one in-scope correction, answer, authorization, or next coupled phase.
-- Use `hub` with `op: "cancel"` and exact job `ids` for stale, superseded, or scope-breaching work.
-- A follow-up to a parked session revives the same session when the host reports that capability.
+- `read proc://` lists caller-owned jobs, services, and registered running-agent references outside jobs; a `running` row can be stale. `read proc://<jobId>` inspects job state/output without consuming delivery; it reports job state, not whether an idle child session remains reusable.
+- `wait` takes no IDs. It wakes for an owned Task result or peer message, consumes the events it returns, and may return multiple concurrently settled jobs; use it only when blocked, repeating as needed. Async delivery may arrive without `wait`.
+- Read `agent://<agentId>` for the saved Task result; later peer replies do not update it. Read `history://<agentId>` for the full transcript, including follow-ups. A result artifact or on-disk transcript does not prove that the child is executing or can be resumed.
+- `write agent://<agentId>` sends a peer message only when OMP peer messaging is available. A delivery receipt is not an acknowledgment or an interrupt to a running tool; the child may handle it after the tool returns or while a shell command is backgrounded to process messages and continues running.
+- `write proc://<jobId>/kill` with no content cancels a running owned Task; if the job has settled but its idle registration is retained, the same target may drop that registration while the job row remains `completed`. It is not a checkpoint or rollback: preserve partial work and verify a safe boundary before cancellation. The human-facing Agent Hub is a TUI, not a `hub` tool API.
+- A non-isolated Task that finishes without a hard abort normally leaves its agent session idle, whether its work succeeded or failed; an aborted session is terminal. An idle child can receive another `agent://` message in the same session. A parked child may be revived when its persisted reviver and workspace are available. Isolated Task sessions are not reusable.
+- If a surface is unavailable, report that capability as unavailable. Do not invent a `hub` operation or infer liveness from result/history artifacts. Resolve prior ownership before starting a fresh Task with a complete handoff; do not create a second writer while the earlier child may still act.
 - Never steer a reviewer toward a preferred conclusion.
-- Use only operations exposed by the live `hub` schema. Do not invent lifecycle operations.
 - Ignore duplicate terminal deliveries and reject stale artifact generations.
 
 A task result is evidence, not completion. The root inspects the artifact and runs verification.
@@ -154,9 +157,9 @@ Copy the active playbook's standing policy text verbatim when it supplies one.
 1. Author one standalone brief.
 2. Start one task with the mapped agent.
 3. Record its semantic name, agent ID, job ID, role, scope, isolation mode, base SHA, and expected artifact.
-4. Consume the async result when delivered.
-5. Read `agent://<id>`; inspect `history://<id>` when needed.
-6. Send one IRC correction only within the same unit.
+4. Consume the async result when delivered; use no-argument `wait` only when blocked.
+5. Read `agent://<agentId>`; inspect `history://<agentId>` for transcript context, not liveness.
+6. Send one bounded `write agent://<agentId>` correction only within the same unit and only when peer messaging is available.
 7. Inspect the artifact and independently run the promised verification.
 8. Accept the unit only after the parent verifies the reported output.
 
@@ -167,7 +170,7 @@ A role or unit change requires a fresh task.
 1. Partition independent slices or race arms with one task per participant.
 2. Start every participant in one batch before consuming any result.
 3. Track participants by semantic name and identifiers, never arrival order.
-4. Wait for every required result through `hub` `op: "wait"`, or cancel it explicitly through `hub` `op: "cancel"`.
+4. Track each returned job ID; let results auto-deliver and use repeated no-argument `wait` calls only while blocked. `wait` cannot select IDs; account for every required participant's terminal result or explicitly record its cancellation/gap. Use `write proc://<jobId>/kill` only to abort a stale job after checking its safe boundary.
 5. Ignore duplicate terminal delivery.
 6. Freeze implementation artifacts, branches, head SHAs, reports, and hashes.
 7. Start every independent reviewer in a new batch only after the candidates are frozen.
@@ -179,12 +182,13 @@ Do not mix implementers, reviewers, or synthesizers in one session. Do not let r
 ### Long-lived owner
 
 1. Start one non-isolated `task` session with the complete owner brief.
-2. Record its agent ID and reuse it. Do not start a sibling owner for the same unit.
+2. Record its agent ID and job ID separately; use the agent ID for follow-up and the job ID for process control, even if they match. A completed Task leaves an idle session, not a continuously working child.
 3. The owner works only in its assigned branch and paths and never starts children.
-4. Send a `hub` `op: "send"` follow-up only for the next coupled phase, an in-scope correction, an answer resolved from evidence, or explicit authorization.
-5. Require a terminal report at each verification boundary.
-6. Independently verify the boundary before authorizing the next phase.
-7. Stand down on ownership violation, stale generation, or terminal scope breach.
+4. Send a `write agent://<agentId>` follow-up only for the next coupled phase, an in-scope correction, an evidence-based answer, or explicit authorization, and only while OMP peer messaging is available.
+5. OMP's configured idle TTL (420000 ms by default in v18.4.3) parks the session. A parked child may revive through `write agent://<agentId>` only when its persisted reviver and workspace are available; otherwise reconcile that the old child is quiescent and its partial state before starting a fresh Task with a complete handoff. Isolated Task sessions are not reusable.
+6. Require a terminal report at each verification boundary.
+7. Independently verify the boundary before authorizing the next phase.
+8. Stand down on ownership violation, stale generation, or terminal scope breach.
 
 ### One-shot watcher
 
@@ -201,7 +205,7 @@ A watcher observes. It does not fix, merge, authorize, or silently follow a chan
 
 Children resolve uncertainty from source, standing policy, frozen evidence, or the brief. Otherwise they use the safest reversible interpretation and report the assumption, or return `BLOCKED` with the exact missing decision and evidence gathered.
 
-The root resolves a child question and sends the answer through `hub` `op: "send"` to the existing agent. Ask the user only for genuine product preference, unavailable authority, or an irreversible action not covered by standing orders.
+The root resolves a child question and sends the answer through `write agent://<agentId>` when OMP peer messaging is available. Otherwise, use a fresh Task only after the previous child is quiescent and its partial state is reconciled, or handle the decision at the root; never invent a `hub` send operation.
 
 ## Ownership and verification
 

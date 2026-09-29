@@ -90,10 +90,10 @@ Use `outputSchema` only when the coordinator needs a machine-readable result. Se
 ## 4. Coordinate
 
 - Results auto-deliver. Continue handling user messages and independent root work instead of polling continuously.
-- Siblings may exchange concise dependency updates through OMP IRC. Name expected dependencies in shared context so communication is purposeful rather than discovery by negotiation.
-- Use the live job-control surface only to wait for required work, inspect status, send a bounded correction, or cancel stale work.
-- Read complete results from `agent://<id>` and use `history://<id>` when a report is incomplete or suspicious.
-- A completed job means the child yielded successfully. It does not mean its artifact is accepted.
+- Use `write agent://<id>` for a bounded sibling message only when OMP peer messaging is available. A delivery receipt is not an acknowledgment or an immediate interrupt.
+- OMP `wait` takes no IDs and wakes for the next owned Task result or peer message, consuming returned events; it may return multiple concurrently settled jobs. Results may auto-deliver; call `wait` only when blocked and repeat to drain required work.
+- Use `read proc://` or `read proc://<jobId>` for background-job status/output. A completed job row is not proof that the child session still exists; a listed `running` registration may also be stale.
+- Use `write proc://<jobId>/kill` with no content only to abort an owned job after checking its safe boundary. OMP has no `hub` tool API; `agent://<id>` is the saved Task result and later replies remain in `history://<id>`, a transcript rather than live execution evidence. See the [OMP Task lifecycle contract](../pstack-pi/references/runtime.md#omp-task-lifecycle-and-interaction-v1843).
 
 ## 5. Integrate
 

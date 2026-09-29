@@ -214,9 +214,9 @@ branch or worktree.
 For a new root that must reconstruct pstack work, use the actual playbooks
 `skill://poteto-mode/playbooks/pause-safely.md` and
 `skill://poteto-mode/playbooks/session-pickup.md`. They preserve a durable,
-workspace-scoped trail; they do not make OMP discover or resume an old root
-automatically. In this adapter, `history://` is registered-agent history, not a
-catalog of root OMP sessions.
+workspace-scoped trail; they do not make OMP discover or resume an old root automatically.
+`history://` indexes registered agents and discovered on-disk child transcripts; it
+is not a catalog of root OMP sessions or evidence that a child is currently active.
 
 ## Long-running work and verification
 
@@ -271,3 +271,25 @@ tracked content, including dirty files; status lists untracked paths, not their
 content. Git status and diff omit ignored files and external state. Preserve or
 fingerprint any untracked or ignored/generated path the child may touch. If the
 parent changes unexpectedly, stop and preserve the evidence; do not auto-revert.
+
+## OMP Task lifecycle and interaction (v18.4.3)
+
+The `task` tool accepts a batch with shared `context` and per-item `task` and `solutionSpace`. With `async.enabled: true`, it returns child/job identifiers and delivers each result asynchronously. Record the semantic name, agent ID, and job ID independently; equal strings in one run do not make them the same identifier.
+
+- `wait` has no ID parameter. It wakes on an owned Task result or peer message, consumes the events it returns, and may return multiple concurrently settled jobs; it can also be interrupted. Results may instead auto-deliver. Use it only when blocked, and repeat it to drain required work; do not use it as an ID-targeted poll.
+- `read proc://` lists caller-owned background jobs, services, and registered running-agent references outside jobs; a `running` row may be stale. `read proc://<jobId>` reports that job's current state/output without consuming delivery. It reports job state, not the continued existence or readiness of the child session; a retained `completed` job row can outlive the child.
+- `read agent://<agentId>` reads the saved Task-result artifact; later peer replies do not update it. `read history://<agentId>` reads the transcript, including follow-ups; the no-argument `history://` index lists registered or on-disk agents. An artifact or transcript can survive after the child is gone; `on disk`, `parked`, and `aborted` are not running work. Use actual live status, not file presence or history timestamps, for liveness.
+- OMP's Agent Hub is a human-facing TUI roster and control surface, not a `hub` tool API. For model-facing control, use the native `proc://`, `agent://`, `history://`, and `wait` surfaces. If the host surface cannot establish state, report it as unknown rather than infer it.
+
+`write agent://<agentId>` sends a peer message when peer messaging is available. A successful delivery receipt does not prove that the child read or answered it. The child may defer handling it until a tool returns; OMP can also background a long-running shell command and let the child handle the message while that command continues. Neither behavior interrupts arbitrary work or guarantees a safe zero-writes hold. Peer-messaging availability is derived from the active session and Task depth, not a `task.peerMessaging.enabled` setting.
+
+A non-isolated Task that finishes without a hard abort leaves its agent session `idle`, whether its work succeeded or failed; job status and session lifecycle are separate. A hard-aborted session is terminal. An idle session can receive a follow-up through `write agent://<agentId>`. OMP's default `task.agentIdleTtlMs` is 420000 ms; an idle session then becomes `parked` and its live session is disposed. A parked session may revive from its persisted transcript when OMP can rebuild its reviver and workspace. Discovery of a transcript alone does not prove revival is possible. `isolated:true` Task sessions are not reusable.
+
+`write proc://<jobId>/kill` with no content cancels a running owned Task job: the job reports `cancelled` and the child session becomes terminal `aborted`. A kill routed to a retained idle registration may instead release that session while its job row remains `completed`; after the row is reaped, the model-facing target returns not-found. A running agent outside a job can be targeted with `write proc://<agentId>/kill`. Cancellation is not a checkpoint or rollback: tool output and transcripts may retain partial work, while the result artifact may be absent or partial. Inspect and preserve side effects before cancellation. The human Agent Hub can release a selected idle agent with `x`.
+
+If peer messaging is unavailable in the sender's session, `write agent://` fails; an unknown or aborted recipient also fails, and a missing or reaped process ID returns not-found instead of falling back to another API. Keep the state unknown, preserve existing artifacts, and resolve prior ownership before starting a fresh Task with a complete handoff.
+
+## OMP v18.4.3 contract sources
+
+- [Task tool](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/tools/task.md), [wait tool](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/tools/wait.md), and [Agent Hub](https://github.com/can1357/oh-my-pi/blob/v18.4.3/docs/agent-hub.md).
+- Runtime protocols: [`proc://`](https://github.com/can1357/oh-my-pi/blob/v18.4.3/packages/coding-agent/src/internal-urls/proc-protocol.ts), [`agent://`](https://github.com/can1357/oh-my-pi/blob/v18.4.3/packages/coding-agent/src/internal-urls/agent-protocol.ts), [`history://`](https://github.com/can1357/oh-my-pi/blob/v18.4.3/packages/coding-agent/src/internal-urls/history-protocol.ts), [`wait`](https://github.com/can1357/oh-my-pi/blob/v18.4.3/packages/coding-agent/src/tools/wait.ts), and [agent lifecycle](https://github.com/can1357/oh-my-pi/blob/v18.4.3/packages/coding-agent/src/registry/agent-lifecycle.ts).
