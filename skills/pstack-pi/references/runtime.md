@@ -153,12 +153,15 @@ An observable fact belongs to a probe or verification run, not a user question.
 
 ## Skills and paths
 
-Invoke skills by their host-supported skill name, normally `/skill:<name>` or `$name`.
-Use `skill://<skill-name>` to load a skill. For a file under that skill, use
-`skill://<skill-name>/<relative-path>`. The first path segment is always the
-actual skill name, not the name of the currently active skill. Resolve relative
-Markdown links against the file that contains them; do not turn a relative path
-into a URI prefixed with the active skill name.
+Invoke skills by their host-supported name, normally `/skill:<name>` or `$name`.
+Read a skill with the host's resource reader using `skill://<skill-name>`. For a
+file under that skill, use `skill://<skill-name>/<relative-path>`. The first path
+segment is always the actual skill name, not the name of the currently active
+skill. Resolve relative Markdown links against the file that contains them; do
+not turn a relative path into a URI prefixed with the active skill name.
+A Python REPL's `%load` loads source into Python; it does not invoke a skill.
+Use the host's skill invocation or resource reader instead of passing a skill URI
+to `%load`.
 
 Within this package, sibling files are under `skills/<name>/`. Do not use a
 vendor-specific plugin path or assume a global installation path.
