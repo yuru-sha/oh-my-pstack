@@ -218,7 +218,7 @@ test("poteto-mode playbooks link long-lived owner to the capability matrix", asy
   }
 });
 
-test("poteto-mode playbooks do not describe a long-lived owner as continuously working", async () => {
+test("shared playbooks keep owner lifecycle conditional on adapter capabilities", async () => {
   for (const path of [
     ["skills", "poteto-mode", "playbooks", "autopilot-full.md"],
     ["skills", "poteto-mode", "playbooks", "autopilot-stack.md"],
@@ -226,10 +226,29 @@ test("poteto-mode playbooks do not describe a long-lived owner as continuously w
     ["skills", "poteto-mode", "playbooks", "visual-parity.md"],
   ]) {
     const text = await readMarkdown(...path);
-    assert.match(
+    assert.match(text, /capability\s+matrix/u, `${path.join("/")} must defer owner lifecycle to the adapter's capability matrix`);
+    assertNoMatch(
       text,
-      /not\s+a\s+continuously\s+working\s+process/u,
-      `${path.join("/")} must clarify that owner retention is not a continuously working process`,
+      /retention (?:is|uses) the active adapter's persisted-session lifecycle, not a continuously working process/u,
+      `${path.join("/")} must not assert OMP's session lifecycle as a universal contract`,
+    );
+  }
+});
+
+test("shared playbooks do not embed OMP control syntax", async () => {
+  for (const path of [
+    ["skills", "poteto-mode", "playbooks", "autopilot-full.md"],
+    ["skills", "poteto-mode", "playbooks", "autopilot-stack.md"],
+    ["skills", "poteto-mode", "playbooks", "orchestrate.md"],
+    ["skills", "poteto-mode", "playbooks", "visual-parity.md"],
+    ["skills", "poteto-mode", "playbooks", "worktree-cleanup.md"],
+    ["skills", "poteto-mode", "playbooks", "pause-safely.md"],
+  ]) {
+    const text = await readMarkdown(...path);
+    assertNoMatch(
+      text,
+      /\bOMP\b|proc:\/\/|agent:\/\/|history:\/\/|isolated:true/u,
+      `${path.join("/")} must leave OMP control syntax to the adapter`,
     );
   }
 });
