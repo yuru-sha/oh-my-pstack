@@ -234,6 +234,21 @@ test("shared playbooks keep owner lifecycle conditional on adapter capabilities"
     );
   }
 });
+test("autopilot playbooks delegate wait semantics to the active adapter", async () => {
+  for (const path of [
+    ["skills", "poteto-mode", "playbooks", "autopilot-full.md"],
+    ["skills", "poteto-mode", "playbooks", "autopilot-stack.md"],
+  ]) {
+    const text = await readMarkdown(...path);
+    assert.match(text, /active adapter's documented wait and live-status contract/u);
+    assert.match(text, /do not use waiting as a substitute for current-state evidence/u);
+    assertNoMatch(
+      text,
+      /`wait` is an event wait|not a per-owner liveness poll/u,
+      `${path.join("/")} must not impose OMP wait semantics on every host`,
+    );
+  }
+});
 
 test("shared playbooks do not embed OMP control syntax", async () => {
   for (const path of [
